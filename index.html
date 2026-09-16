@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>我的一周计划</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f6f7fb;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC",sans-serif}
+.app{max-width:680px;margin:auto;padding:14px 12px 30px}.top{background:#fff;border-radius:22px;padding:16px;box-shadow:0 4px 18px #0000000d;position:sticky;top:8px;z-index:5}
+.title{font-size:24px;font-weight:800}.range{text-align:center;color:#777;font-size:13px;margin-top:5px}
+.nav{display:flex;gap:7px;margin-top:13px}.nav button{flex:1}.btn{border:0;border-radius:12px;padding:10px;background:#eeeef2;color:#222;font-size:14px;font-weight:600}.primary{background:#4f46e5;color:white}
+.day{background:#fff;border-radius:19px;margin-top:11px;padding:14px;box-shadow:0 3px 14px #00000008}.day.today{box-shadow:0 0 0 2px #4f46e5,0 3px 14px #00000008}
+.dayhead{display:flex;justify-content:space-between;align-items:center}.dow{font-size:18px;font-weight:800}.date{font-size:12px;color:#888;margin-top:2px}
+.add{width:100%;margin-top:9px}.task{margin-top:9px;border:1px solid #e2e2e7;border-radius:14px;padding:10px}.taskline{display:flex;gap:8px;align-items:center}.check{width:20px;height:20px}.tasktitle{flex:1;border:0;outline:0;font-size:16px;min-width:0;background:transparent}.task.done .tasktitle{text-decoration:line-through;color:#999}
+.time{margin-top:8px;width:100%;border:1px solid #ddd;border-radius:9px;padding:8px;background:#fafafa}.note{width:100%;margin-top:8px;border:1px solid #ddd;border-radius:9px;padding:8px;min-height:42px;resize:vertical;font-size:13px}.x{border:0;background:none;color:#aaa;font-size:22px;padding:0 3px}
+.empty{color:#aaa;text-align:center;font-size:13px;padding:12px}
+.modal{display:none;position:fixed;inset:0;background:#0006;z-index:20;align-items:flex-end}.modal.show{display:flex}.sheet{background:#fff;width:100%;border-radius:24px 24px 0 0;padding:18px;max-width:680px;margin:auto}.sheet h2{margin:0 0 14px;font-size:20px}.field{margin:9px 0}.field label{display:block;font-size:12px;color:#777;margin-bottom:5px}.field input,.field textarea{width:100%;padding:11px;border:1px solid #ddd;border-radius:11px;font-size:16px}.sheetbuttons{display:flex;gap:8px;margin-top:14px}.sheetbuttons button{flex:1}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="title">📅 我的每周计划</div>
+    <div id="range" class="range"></div>
+    <div class="nav">
+      <button class="btn" onclick="moveWeek(-1)">← 上周</button>
+      <button class="btn" onclick="thisWeek()">本周</button>
+      <button class="btn" onclick="moveWeek(1)">下周 →</button>
+    </div>
+  </div>
+  <div id="days"></div>
+</div>
+
+<div id="modal" class="modal" onclick="if(event.target===this)closeModal()">
+ <div class="sheet">
+  <h2>添加事情</h2>
+  <div class="field"><label>事情</label><input id="newTitle" placeholder="例如：上课 / 学习 / 买菜"></div>
+  <div class="field"><label>时间</label><input id="newTime" type="time"></div>
+  <div class="field"><label>备注</label><textarea id="newNote" placeholder="地点、要准备的东西……"></textarea></div>
+  <div class="sheetbuttons"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveNew()">保存</button></div>
+ </div>
+</div>
+
+<script>
+let monday=getMonday(new Date());
+let plans=JSON.parse(localStorage.getItem("weekly_planner_v3")||"{}");
+let addKey=null;
+function getMonday(d){let x=new Date(d);x.setHours(0,0,0,0);let n=x.getDay()||7;x.setDate(x.getDate()-n+1);return x}
+function key(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function dateText(d){return d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日"}
+function esc(s){return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+function persist(){localStorage.setItem("weekly_planner_v3",JSON.stringify(plans))}
+function render(){
+ let end=new Date(monday);end.setDate(end.getDate()+6);
+ document.getElementById("range").textContent=dateText(monday)+" — "+dateText(end);
+ let today=key(new Date()), html="";
+ const names=["周一","周二","周三","周四","周五","周六","周日"];
+ for(let i=0;i<7;i++){
+  let d=new Date(monday);d.setDate(d.getDate()+i);let k=key(d);if(!plans[k])plans[k]=[];
+  html+=`<section class="day ${k===today?"today":""}">
+   <div class="dayhead"><div><div class="dow">${names[i]}</div><div class="date">${dateText(d)}</div></div></div>
+   <div>`;
+  if(!plans[k].length) html+=`<div class="empty">今天还没有安排</div>`;
+  plans[k].forEach((t,j)=>{
+   html+=`<div class="task ${t.done?"done":""}">
+    <div class="taskline"><input class="check" type="checkbox" ${t.done?"checked":""} onchange="toggle('${k}',${j},this.checked)">
+    <input class="tasktitle" value="${esc(t.title)}" placeholder="要做什么？" oninput="change('${k}',${j},'title',this.value)">
+    <button class="x" onclick="removeTask('${k}',${j})">×</button></div>
+    <input class="time" type="time" value="${esc(t.time)}" onchange="change('${k}',${j},'time',this.value)">
+    <textarea class="note" placeholder="备注 / 地点 / 其他……" oninput="change('${k}',${j},'note',this.value)">${esc(t.note)}</textarea>
+   </div>`;
+  });
+  html+=`</div><button class="btn add" onclick="openModal('${k}')">＋ 添加事情</button></section>`;
+ }
+ document.getElementById("days").innerHTML=html;persist();
+}
+function openModal(k){addKey=k;document.getElementById("newTitle").value="";document.getElementById("newTime").value="";document.getElementById("newNote").value="";document.getElementById("modal").classList.add("show");setTimeout(()=>document.getElementById("newTitle").focus(),100)}
+function closeModal(){document.getElementById("modal").classList.remove("show")}
+function saveNew(){let title=document.getElementById("newTitle").value.trim();let time=document.getElementById("newTime").value;let note=document.getElementById("newNote").value.trim();if(!title&&!time&&!note){document.getElementById("newTitle").focus();return}plans[addKey].push({title,time,note,done:false});persist();closeModal();render()}
+function change(k,j,f,v){plans[k][j][f]=v;persist()}
+function toggle(k,j,v){plans[k][j].done=v;persist();render()}
+function removeTask(k,j){plans[k].splice(j,1);persist();render()}
+function moveWeek(n){monday.setDate(monday.getDate()+n*7);render();window.scrollTo({top:0,behavior:"smooth"})}
+function thisWeek(){monday=getMonday(new Date());render();window.scrollTo({top:0,behavior:"smooth"})}
+render();
+</script>
+</body>
+</html>
