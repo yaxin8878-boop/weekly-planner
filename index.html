@@ -99,17 +99,32 @@ const KEY='cannot_pigeon_planner_v1';
 let data=JSON.parse(localStorage.getItem(KEY)||'{}');
 let weekOffset=0, editing=null;
 const names=['周一','周二','周三','周四','周五','周六','周日'];
-function iso(d){return d.toISOString().slice(0,10)}
-function monday(d){let x=new Date(d);let n=x.getDay()||7;x.setDate(x.getDate()-n+1);x.setHours(0,0,0,0);return x}
+function iso(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function monday(d){
+  const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  const day=x.getDay(); // Sun=0, Mon=1 ... Sat=6
+  const diff=(day===0 ? -6 : 1-day);
+  x.setDate(x.getDate()+diff);
+  x.setHours(0,0,0,0);
+  return x;
+}
 function render(){
- const base=monday(new Date());base.setDate(base.getDate()+weekOffset*7);
- document.getElementById('topDate').textContent=new Date().toLocaleDateString('zh-CN',{month:'numeric',day:'numeric'});
+ const now=new Date();
+ const base=monday(now);base.setDate(base.getDate()+weekOffset*7);
+ document.getElementById('topDate').textContent=now.toLocaleDateString('en-NZ',{day:'numeric',month:'short',year:'numeric'});
  let out='';
- for(let i=0;i<7;i++){let d=new Date(base);d.setDate(base.getDate()+i);let key=iso(d);let tasks=(data[key]||[]).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
- out+=`<section class="day"><div class="dayhead"><div><span class="dayname">${names[i]}</span><span class="date">${d.getMonth()+1}月${d.getDate()}日</span></div>${iso(new Date())===key?'<span class="badge">TODAY</span>':''}</div>`;
- if(!tasks.length) out+=`<div class="empty">Today还没有安排 ♡</div>`;
- tasks.forEach((t,idx)=>out+=taskHTML(t,key,idx));
- out+=`</section>`}
+ for(let i=0;i<7;i++){
+   let d=new Date(base);d.setDate(base.getDate()+i);
+   let key=iso(d);
+   let tasks=(data[key]||[]).sort((a,b)=>(a.time||'99:99').localeCompare(b.time||'99:99'));
+   const isToday=iso(now)===key;
+   out+=`<section class="day"><div class="dayhead"><div><span class="dayname">${names[i]}</span><span class="date">${d.getDate()} ${d.toLocaleDateString('en-NZ',{month:'short'})}</span></div>${isToday?'<span class="badge">TODAY</span>':''}</div>`;
+   if(!tasks.length) out+=`<div class="empty">No plans</div>`;
+   tasks.forEach((t,idx)=>out+=taskHTML(t,key,idx));
+   out+=`</section>`;
+ }
  document.getElementById('days').innerHTML=out;
 }
 function taskHTML(t,key,idx){return `<div class="task ${t.done?'done':''}">
